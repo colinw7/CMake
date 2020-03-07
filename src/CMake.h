@@ -32,7 +32,7 @@ class CMake {
   Variable *getVariable(const std::string &name) const;
 
  private:
-  class Rule;
+  struct Rule;
 
   using Words = std::vector<std::string>;
 

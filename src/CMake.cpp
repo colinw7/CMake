@@ -156,18 +156,18 @@ processFile(const std::string &filename, bool silent)
 
       parse1.skipSpace();
 
-      bool silent = false;
-      bool ignore = false;
+      bool silent1 = false;
+      bool ignore1 = false;
 
       if      (parse1.isChar('@')) {
         parse1.skipChar();
 
-        silent = true;
+        silent1 = true;
       }
       else if (parse1.isChar('-')) {
         parse1.skipChar();
 
-        ignore = true;
+        ignore1 = true;
       }
 
       std::string value1 = parse1.getAt();
@@ -175,8 +175,8 @@ processFile(const std::string &filename, bool silent)
       if (rule_) {
         Cmd *cmd = rule_->addCmd(value1);
 
-        cmd->setSilent(silent);
-        cmd->setIgnore(ignore);
+        cmd->setSilent(silent1);
+        cmd->setIgnore(ignore1);
       }
       else
         std::cerr << "NO CURRENT RULE: " << line << "\n";
@@ -266,7 +266,7 @@ processFile(const std::string &filename, bool silent)
       // -include file
       // sinclude file
       else if (name == "include" || name == "-include" || name == "sinclude") {
-        bool silent = (name != "include");
+        bool silent1 = (name != "include");
 
         parse.skipSpace();
 
@@ -280,8 +280,8 @@ processFile(const std::string &filename, bool silent)
 
         stringToFiles(value, files);
 
-        for (const auto &file : files)
-          processFile(file, silent);
+        for (const auto &file1 : files)
+          processFile(file1, silent1);
       }
       // override variable-assignment
       else if (name == "override") {
