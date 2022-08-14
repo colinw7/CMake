@@ -21,7 +21,10 @@ class CMake {
  public:
   CMake();
 
+  bool isQuiet() const { return quiet_; }
   void setQuiet(bool b) { quiet_ = b; }
+
+  bool isDebug() const { return debug_; }
   void setDebug(bool b) { debug_ = b; }
 
   bool processFile(const std::string &filename, bool silent=false);
@@ -32,7 +35,7 @@ class CMake {
   Variable *getVariable(const std::string &name) const;
 
  private:
-  struct Rule;
+  class Rule;
 
   using Words = std::vector<std::string>;
 
@@ -97,46 +100,57 @@ class CMake {
 
   using Cmds = std::vector<Cmd *>;
 
-  struct Rule {
-    std::string lhs;
-    Words       rwords;
-    Cmds        cmds;
-    bool        phony { false };
-
+  class Rule {
+   public:
     Rule(const std::string &lhs="", const Words &rwords=Words()) :
-     lhs(lhs), rwords(rwords) {
+     lhs_(lhs), rwords_(rwords) {
     }
 
    ~Rule() {
-      for (auto &cmd : cmds)
+      for (auto &cmd : cmds_)
         delete cmd;
     }
 
     Cmd *addCmd(const std::string &cmdStr) {
-      Cmd *cmd = new Cmd(cmdStr);
+      auto *cmd = new Cmd(cmdStr);
 
-      cmds.push_back(cmd);
+      cmds_.push_back(cmd);
 
       return cmd;
     }
 
-    bool isPhony() const { return phony; }
-    void setPhony(bool b) { phony = b; }
+    const std::string &lhs() const { return lhs_; }
+
+    const Words &rwords() { return rwords_; }
+
+    const Cmds &cmds() { return cmds_; }
+
+    bool isPhony() const { return phony_; }
+    void setPhony(bool b) { phony_ = b; }
+
+    //---
 
     void print() const {
-      std::cerr << lhs << ":";
+      std::cerr << lhs() << ":";
 
-      for (const auto &word :rwords)
+      for (const auto &word : rwords_)
         std::cerr << " " << word;
 
       std::cerr << "\n";
 
-      for (const auto &cmd : cmds) {
+      for (const auto &cmd : cmds_) {
         std::cerr << "\t";
 
         cmd->print();
       }
     }
+
+   private:
+    std::string lhs_;
+    Words       rwords_;
+    Cmds        cmds_;
+    bool        phony_ { false };
+
   };
 
   using Rules = std::map<std::string,Rule *>;

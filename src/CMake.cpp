@@ -87,6 +87,8 @@ main(int argc, char **argv)
     make.make();
 }
 
+//---
+
 CMake::
 CMake()
 {
@@ -96,6 +98,9 @@ bool
 CMake::
 processFile(const std::string &filename, bool silent)
 {
+  if (isDebug())
+    std::cerr << "Process " << filename << "\n";
+
   CFile file(filename);
 
   if (! file.open(CFileBase::Mode::READ)) {
@@ -123,22 +128,23 @@ processFile(const std::string &filename, bool silent)
           if (c1 == '\n')
             continue;
           else {
-            line += c;
-            line += c1;
+            line += char(c);
+            line += char(c1);
           }
         }
         else
-          line += c;
+          line += char(c);
       }
       else if (c == '\n')
         break;
       else
-        line += c;
+        line += char(c);
     }
 
     lines.push_back(line);
 
-    //std::cout << "Line: " << line << "\n";
+    if (isDebug())
+      std::cerr << "Line: " << line << "\n";
   }
 
   for (auto &line : lines) {
@@ -150,7 +156,7 @@ processFile(const std::string &filename, bool silent)
 
       parse.skipChar();
 
-      std::string value = parse.getAt();
+      auto value = parse.getAt();
 
       CStrParse parse1(value);
 
@@ -170,16 +176,20 @@ processFile(const std::string &filename, bool silent)
         ignore1 = true;
       }
 
-      std::string value1 = parse1.getAt();
+      auto value1 = parse1.getAt();
 
       if (rule_) {
-        Cmd *cmd = rule_->addCmd(value1);
+        if (isDebug())
+          std::cerr << "ADD RULE " << rule_->lhs() << " : " << value1 << "\n";
+
+        auto *cmd = rule_->addCmd(value1);
 
         cmd->setSilent(silent1);
         cmd->setIgnore(ignore1);
       }
-      else
+      else {
         std::cerr << "NO CURRENT RULE: " << line << "\n";
+      }
 
       continue;
     }
@@ -217,12 +227,13 @@ processFile(const std::string &filename, bool silent)
       }
       // undefine variable
       else if (name == "undefine") {
+        std::cerr << "TODO: " << line << "\n";
       }
       // ifdef variable
       else if (name == "ifdef") {
         parse.skipSpace();
 
-        std::string value = parse.getAt();
+        auto value = parse.getAt();
 
         value = replaceVariables(value);
 
@@ -234,7 +245,7 @@ processFile(const std::string &filename, bool silent)
       else if (name == "ifndef") {
         parse.skipSpace();
 
-        std::string value = parse.getAt();
+        auto value = parse.getAt();
 
         value = replaceVariables(value);
 
@@ -270,11 +281,12 @@ processFile(const std::string &filename, bool silent)
 
         parse.skipSpace();
 
-        std::string value = parse.getAt();
+        auto value = parse.getAt();
 
         value = replaceVariables(value);
 
-        std::cout << "INCLUDE: " << value << "\n";
+        if (isDebug())
+          std::cerr << "INCLUDE: " << value << "\n";
 
         Words files;
 
@@ -317,52 +329,57 @@ processFile(const std::string &filename, bool silent)
 
         parse.skipSpace();
 
+        // set name value
         if      (parse.isChar('=')) {
           parse.skipChar();
 
           parse.skipSpace();
 
-          std::string value = parse.getAt();
+          auto value = parse.getAt();
 
           defineVariable(name, value, /*deferred*/true);
         }
+        // set deferred name value
         else if (parse.isString("?=")) {
           parse.skipChar(2);
 
           parse.skipSpace();
 
-          std::string value = parse.getAt();
+          auto value = parse.getAt();
 
           defineVariable(name, value, /*deferred*/true);
         }
+        // set name value
         else if (parse.isString(":=")) {
           parse.skipChar(2);
 
           parse.skipSpace();
 
-          std::string value = parse.getAt();
+          auto value = parse.getAt();
 
           value = replaceVariables(value);
 
           defineVariable(name, value, /*deferred*/false);
         }
+        // set deferred name value
         else if (parse.isString("::=")) {
           parse.skipChar(3);
 
           parse.skipSpace();
 
-          std::string value = parse.getAt();
+          auto value = parse.getAt();
 
           value = replaceVariables(value);
 
           defineVariable(name, value, /*deferred*/false);
         }
+        // append to name value
         else if (parse.isString("+=")) {
           parse.skipChar(2);
 
           parse.skipSpace();
 
-          std::string value = parse.getAt();
+          auto value = parse.getAt();
 
           bool deferred = false;
 
@@ -374,17 +391,19 @@ processFile(const std::string &filename, bool silent)
 
           defineVariable(name, value, deferred);
         }
+        // set name value
         else if (parse.isString("!=")) {
           parse.skipChar(2);
 
           parse.skipSpace();
 
-          std::string value = parse.getAt();
+          auto value = parse.getAt();
 
           value = replaceVariables(value);
 
           defineVariable(name, value, /*deferred*/false);
         }
+        // rule
         else if (parse.isChar(':')) {
           parse.skipChar();
 
@@ -392,7 +411,7 @@ processFile(const std::string &filename, bool silent)
 
           name = replaceVariables(name);
 
-          std::string value = parse.getAt();
+          auto value = parse.getAt();
 
           Words rwords;
 
@@ -416,7 +435,7 @@ processFile(const std::string &filename, bool silent)
 
         parse.skipSpace();
 
-        std::string rhs = parse.getAt();
+        auto rhs = parse.getAt();
 
         lhs = replaceVariables(lhs);
 
@@ -512,17 +531,20 @@ void
 CMake::
 make(Rule *rule)
 {
+  if (isDebug())
+    std::cerr << "MAKE " << rule->lhs() << "\n";
+
   rule->print();
 
-  if (outOfDate(rule->lhs, rule->rwords)) {
-    for (const auto &rword : rule->rwords) {
-      Rule *rule1 = getRule(rword);
+  if (outOfDate(rule->lhs(), rule->rwords())) {
+    for (const auto &rword : rule->rwords()) {
+      auto *rule1 = getRule(rword);
 
       if (rule1)
         make(rule1);
     }
 
-    for (const auto &cmd : rule->cmds) {
+    for (const auto &cmd : rule->cmds()) {
       std::string cmd1 = replaceVariables(cmd->cmd());
 
       exec(cmd1, cmd->isSilent());
@@ -534,8 +556,8 @@ bool
 CMake::
 outOfDate(const std::string &lhs, const Words &rwords) const
 {
-  if (debug_) {
-    std::cerr << "OUT OF DATE: " << lhs;
+  if (isDebug()) {
+    std::cerr << "CHECK OUT OF DATE: " << lhs;
 
     for (const auto &rword : rwords)
       std::cerr << " " << rword;
@@ -543,21 +565,37 @@ outOfDate(const std::string &lhs, const Words &rwords) const
     std::cerr << "\n";
   }
 
+  // if rhs files don't exist then need build
   for (const auto &rword : rwords) {
-    if (! CFile::exists(rword))
+    if (! CFile::exists(rword)) {
+      if (isDebug())
+        std::cerr << "NOT EXIST : " << rword << "\n";
+
       return true;
+    }
   }
 
-  if (! CFile::exists(lhs))
-    return true;
+  // if lhs file doesn't exist then need build
+  if (! CFile::exists(lhs)) {
+    if (isDebug())
+      std::cerr << "NOT EXIST : " << lhs << "\n";
 
+    return true;
+  }
+
+  // get lhs time
   int t1 = CFile::getMTime(lhs);
 
+  // if any file on rhs is new than rhs then need build
   for (const auto &rword : rwords) {
     int t2 = CFile::getMTime(rword);
 
-    if (t1 < t2)
+    if (t1 < t2) {
+      if (isDebug())
+        std::cerr << "NEWER : " << rword << "\n";
+
       return true;
+    }
   }
 
   return false;
@@ -567,8 +605,11 @@ bool
 CMake::
 exec(const std::string &cmd, bool silent)
 {
+  if (isDebug())
+    std::cerr << "EXEC : " << cmd << "\n";
+
   if (! silent)
-    std::cout << cmd << "\n";
+    std::cerr << cmd << "\n";
 
   return COSProcess::executeCommand(cmd);
 }
@@ -620,8 +661,8 @@ CMake::Variable *
 CMake::
 defineVariable(const std::string &name, const std::string &value, bool deferred)
 {
-  if (debug_)
-    std::cout << "DEFINE VAR: " << name << "=" << value << "\n";
+  if (isDebug())
+    std::cerr << "DEFINE VAR: " << name << "=" << value << "\n";
 
   auto p = variables_.find(name);
 
@@ -707,9 +748,9 @@ defineRule(const std::string &lhs, const Words &rwords)
     return nullptr;
   }
 
-  Rule *rule = new Rule(lhs, rwords);
+  auto *rule = new Rule(lhs, rwords);
 
-  if (debug_) {
+  if (isDebug()) {
     std::cerr << "DEFINE RULE: "; rule->print();
   }
 
@@ -727,7 +768,7 @@ CMake::Rule *
 CMake::
 getRule(const std::string &name) const
 {
-  if (debug_)
+  if (isDebug())
     std::cerr << "GET RULE: " << name << "\n";
 
   auto p = rules_.find(name);
@@ -735,7 +776,7 @@ getRule(const std::string &name) const
   if (p != rules_.end())
     return (*p).second;
 
-  if (debug_)
+  if (isDebug())
     std::cerr << "not found\n";
 
   return nullptr;
